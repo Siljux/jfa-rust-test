@@ -27,30 +27,29 @@ var s_diffuse: sampler;
 var<uniform> step: f32;
 
 @fragment
-fn fs_main(@location(0) in: vec2<f32>) -> @location(0) vec4<f32> {
+fn fs_main(@location(0) in: vec2<f32>, @builtin(position) coords: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = vec2<f32>((in.x + 1) / 2, (in.y - 1) / -2);
 
-    let data = textureSample(t_diffuse, s_diffuse, pos);
-    var closest = decode_coords(data);
+    var closest = decode_coords(textureSample(t_diffuse, s_diffuse, tex_coords(coords.xy)));
 
-    // if (distance(closest, pos) < 0.1) {
-    //     return vec4<f32>(.0, .0, .0, 1.);
-    // }
-
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(-step, -step));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(0, -step));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(step, -step));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(-step, 0));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(step, 0));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(-step, step));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(0, step));
-    closest = compare_point_with_offset(pos, closest, pos + vec2<f32>(step, step));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(-step, -step));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(0, -step));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(step, -step));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(-step, 0));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(step, 0));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(-step, step));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(0, step));
+    closest = compare_point_with_offset(coords.xy, closest, coords.xy + vec2<f32>(step, step));
 
     return vec4<f32>(encode_data(closest.x), encode_data(closest.y));
 }
 
+fn tex_coords(coords: vec2<f32>) -> vec2<f32> {
+    return coords/2048; // hardcoded dimensions
+}
+
 fn compare_point_with_offset(pos: vec2<f32>, current: vec2<f32>, new_pos: vec2<f32>) -> vec2<f32> {
-    let other = decode_coords(textureSample(t_diffuse, s_diffuse, new_pos));
+    let other = decode_coords(textureSample(t_diffuse, s_diffuse, tex_coords(new_pos)));
 
     if distance(pos, other) < distance(pos, current) {
         return other;
@@ -63,9 +62,9 @@ fn decode_coords(color: vec4<f32>) -> vec2<f32> {
 }
 
 fn encode_data(data: f32) -> vec2<f32> {
-    return vec2<f32>(floor(data / 255.), data % 255.);
+    return vec2<f32>(floor(data / 255.)/255, (data % 255.)/255);
 }
 
 fn decode_data(encoded: vec2<f32>) -> f32 {
-    return encoded.x * 255. + encoded.y;
+    return encoded.x * 65025 + encoded.y * 255;
 }

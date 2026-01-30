@@ -553,14 +553,13 @@ impl State {
         // JFA
         // ------
 
-        // let count = self.config.height.isqrt();
-        let mut step = 1f32;
+        let mut step = 2000f32;
 
         let mut ping = (&self.texture_a_bind_group, &self.texture_a_view);
         let mut pong = (&self.texture_b_bind_group, &self.texture_b_view);
 
         let mut i = 0;
-        while i < 8 {
+        while i < 10 {
             step = step / 2.;
             self.queue
                 .write_buffer(&self.step_buffer, 0, bytemuck::cast_slice(&[step]));

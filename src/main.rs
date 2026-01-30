@@ -20,7 +20,7 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = Window::default_attributes()
             .with_title("Window 1")
-            .with_inner_size(PhysicalSize::new(2048, 1800))
+            .with_inner_size(PhysicalSize::new(2048, 2048))
             .with_cursor(winit::window::CursorIcon::Wait);
 
         let window = event_loop.create_window(window_attributes).unwrap();
