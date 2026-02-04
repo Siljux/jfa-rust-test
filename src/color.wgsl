@@ -36,23 +36,14 @@ fn fs_main(@location(0) in: vec2<f32>, @builtin(position) coords: vec4<f32>) -> 
     let c = vec2<f32>(.9, .7);
     let dist = 0.02;
     if distance(coords.xy, mouse.pos) < 40 {
-        return seed(mouse.pos);
+        return vec4f(0.4, 0.7, 0, 1);
     } else if distance(pos, a) < dist {
-        return seed(a*2048);
+        return vec4f(0, 1, 0, 1);
     } else if distance(pos, b) < dist {
-        return seed(b*2048);
+        return vec4f(0, 0, 1, 1);
     } else if distance(pos, c) < dist {
-        return seed(c*2048);
-        // return seed(coords.xy);
+        return vec4f(1, 0, 0, 1);
     } else {
         return vec4<f32>(1., 1., 1., 1.);
     }
-}
-
-fn seed(pos: vec2<f32>) -> vec4<f32> {
-    return vec4<f32>(encode_data(pos.x), encode_data(pos.y));
-}
-
-fn encode_data(data: f32) -> vec2<f32> {
-    return vec2<f32>(floor(data / 255.)/255, (data % 255.)/255);
 }

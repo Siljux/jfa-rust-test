@@ -70,14 +70,17 @@ pub struct State {
     dimensions_bind_group: BindGroup,
     step_bind_group: BindGroup,
     step_buffer: Buffer,
-    // pixel_buffer: Buffer,
     pub size: winit::dpi::PhysicalSize<u32>,
     texture_a: wgpu::Texture,
     texture_b: wgpu::Texture,
+    material_texture: wgpu::Texture,
     texture_a_view: wgpu::TextureView,
     texture_b_view: wgpu::TextureView,
+    material_texture_view: wgpu::TextureView,
     texture_a_bind_group: BindGroup,
     texture_b_bind_group: BindGroup,
+    material_texture_bind_group: BindGroup,
+    color_render_pipeline: wgpu::RenderPipeline,
     initial_render_pipeline: wgpu::RenderPipeline,
     jfa_render_pipeline: wgpu::RenderPipeline,
     final_render_pipeline: wgpu::RenderPipeline,
@@ -241,9 +244,11 @@ impl State {
 
         let texture_a = device.create_texture(&texture_desc);
         let texture_b = device.create_texture(&texture_desc);
+        let material_texture = device.create_texture(&texture_desc);
 
         let texture_a_view = texture_a.create_view(&Default::default());
         let texture_b_view = texture_b.create_view(&Default::default());
+        let material_texture_view = material_texture.create_view(&Default::default());
 
         let jfa_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge, // NOTE: Could be interesting to repeat
@@ -309,6 +314,20 @@ impl State {
             ],
             label: Some("pong_bind_group"),
         });
+        let material_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &jfa_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&material_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&jfa_sampler),
+                },
+            ],
+            label: Some("pong_bind_group"),
+        });
 
         // ------
         // Step Bind Group Layout
@@ -333,6 +352,31 @@ impl State {
             }],
             label: Some("step_bind_group"),
         });
+
+        // ------
+        // Color reference texture
+        // ------
+        let clear_color = wgpu::Color::BLUE;
+
+        let color_render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Color Render Pipeline Layout"),
+                bind_group_layouts: &[&mouse_bind_group_layout, &dimensions_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let color_render_pipeline = {
+            create_render_pipeline(
+                "Color Render Pipeline",
+                &device,
+                &color_render_pipeline_layout,
+                wgpu::TextureFormat::Rgba8Unorm,
+                None,
+                &[Vertex::desc()],
+                shader!("color.wgsl"),
+                wgpu::PrimitiveTopology::TriangleList,
+            )
+        };
 
         // ------
         // Initial Drawing of Seeds
@@ -390,7 +434,7 @@ impl State {
         let final_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Final Render Pipeline Layout"),
-                bind_group_layouts: &[&jfa_bind_group_layout],
+                bind_group_layouts: &[&jfa_bind_group_layout, &jfa_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -428,10 +472,14 @@ impl State {
             size,
             texture_a,
             texture_b,
+            material_texture,
             texture_a_view,
             texture_b_view,
+            material_texture_view,
             texture_a_bind_group,
             texture_b_bind_group,
+            material_texture_bind_group,
+            color_render_pipeline,
             initial_render_pipeline,
             jfa_render_pipeline,
             final_render_pipeline,
@@ -519,6 +567,31 @@ impl State {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let mut encoder = self.new_encoder();
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.material_texture_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(self.clear_color),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            render_pass.set_pipeline(&self.color_render_pipeline);
+            render_pass.set_bind_group(0, &self.mouse_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.dimensions_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(0..3, 0..1);
+        }
+        self.queue.submit(std::iter::once(encoder.finish()));
         // ------
         // SEED
         // ------
@@ -621,6 +694,7 @@ impl State {
 
             render_pass.set_pipeline(&self.final_render_pipeline);
             render_pass.set_bind_group(0, ping.0, &[]);
+            render_pass.set_bind_group(1, &self.material_texture_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..3, 0..1);
         }
